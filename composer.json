@@ -3,6 +3,7 @@
     "type": "neos-plugin",
     "name": "muensmedia/partial-content-export",
     "license": "GPL-3.0-only",
+    "version": "1.0.0",
     "keywords": [
         "neos",
         "neoscms",
