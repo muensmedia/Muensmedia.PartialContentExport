@@ -26,40 +26,40 @@ class PartialContentExportService
      * @Flow\Inject
      * @var ContextFactoryInterface
      */
-    protected ContextFactoryInterface $contextFactory;
+    protected $contextFactory;
 
     /**
      * @Flow\Inject
      *
      * @var SiteRepository
      */
-    protected SiteRepository $siteRepository;
+    protected $siteRepository;
 
     /**
      * @Flow\Inject
      *
      * @var NodeExportService
      */
-    protected NodeExportService $nodeExportService;
+    protected $nodeExportService;
 
     /**
      * @Flow\Inject
      *
      * @var NodeDataRepository
      */
-    protected NodeDataRepository $nodeDataRepository;
+    protected $nodeDataRepository;
 
     /**
      * @Flow\Inject
      * @var PackageManager
      */
-    protected PackageManager $packageManager;
+    protected $packageManager;
 
     /**
      * @Flow\Inject
      * @var NodePathNormalizerService
      */
-    protected NodePathNormalizerService $nodePathNormalizer;
+    protected $nodePathNormalizer;
 
     /**
      * Absolute path to exported resources, or NULL if resources should be inlined in the exported XML

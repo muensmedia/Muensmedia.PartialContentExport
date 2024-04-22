@@ -31,60 +31,60 @@ class ContentCommandController extends CommandController
      * @Flow\Inject
      * @var PartialContentImportService
      */
-    protected PartialContentImportService $importService;
+    protected $importService;
 
     /**
      * @Flow\Inject
      * @var PartialContentExportService
      */
-    protected PartialContentExportService $exportService;
+    protected $exportService;
 
     /**
      * @Flow\Inject
      * @var SiteRepository
      */
-    protected SiteRepository $siteRepository;
+    protected $siteRepository;
 
     /**
      * @Flow\Inject
      * @var SiteService
      */
-    protected SiteService $siteService;
+    protected $siteService;
 
     /**
      * @Flow\Inject
      * @var PackageManager
      */
-    protected PackageManager $packageManager;
+    protected $packageManager;
 
     /**
      * @Flow\Inject
      * @var ContextFactoryInterface
      */
-    protected ContextFactoryInterface $nodeContextFactory;
+    protected $nodeContextFactory;
 
     /**
      * @Flow\Inject
      * @var NodeTypeManager
      */
-    protected NodeTypeManager $nodeTypeManager;
+    protected $nodeTypeManager;
 
     /**
      * @Flow\Inject
      * @var NodeService
      */
-    protected NodeService $nodeService;
+    protected $nodeService;
 
     /**
      * @Flow\Inject
      * @var PersistenceManagerInterface
      */
-    protected PersistenceManagerInterface $persistenceManager;
+    protected $persistenceManager;
 
     /**
-     * @var ThrowableStorageInterface
+     * @var ThrowableStorageInterface|null
      */
-    private ThrowableStorageInterface $throwableStorage;
+    private ?ThrowableStorageInterface $throwableStorage;
 
     /**
      * @var LoggerInterface
@@ -95,7 +95,7 @@ class ContentCommandController extends CommandController
      * @Flow\Inject
      * @var NodePathNormalizerService
      */
-    protected NodePathNormalizerService $nodePathNormalizer;
+    protected $nodePathNormalizer;
 
     /**
      * @param ThrowableStorageInterface $throwableStorage

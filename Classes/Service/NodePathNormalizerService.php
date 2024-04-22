@@ -22,14 +22,14 @@ class NodePathNormalizerService
      * @Flow\Inject
      * @var ContextFactoryInterface
      */
-    protected ContextFactoryInterface $contextFactory;
+    protected $contextFactory;
 
     /**
      * @Flow\Inject
      *
      * @var SiteRepository
      */
-    protected SiteRepository $siteRepository;
+    protected $siteRepository;
 
     protected function resolveContextFromString(string $siteNode): Context|ContentContext|null {
         $sites = $this->siteRepository->findByNodeName($siteNode)->toArray();

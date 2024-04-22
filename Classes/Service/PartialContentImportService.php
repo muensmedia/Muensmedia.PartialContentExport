@@ -45,49 +45,49 @@ class PartialContentImportService
      * @Flow\Inject
      * @var SiteRepository
      */
-    protected SiteRepository $siteRepository;
+    protected $siteRepository;
 
     /**
      * @Flow\Inject
      * @var ContextFactoryInterface
      */
-    protected ContextFactoryInterface $contextFactory;
+    protected $contextFactory;
 
     /**
      * @Flow\Inject
      * @var NodeImportService
      */
-    protected NodeImportService $nodeImportService;
+    protected $nodeImportService;
 
     /**
      * @Flow\Inject
      * @var WorkspaceRepository
      */
-    protected WorkspaceRepository $workspaceRepository;
+    protected $workspaceRepository;
 
     /**
      * @Flow\Inject
      * @var ReflectionService
      */
-    protected ReflectionService $reflectionService;
+    protected $reflectionService;
 
     /**
      * @Flow\Inject
      * @var ObjectManagerInterface
      */
-    protected ObjectManagerInterface $objectManager;
+    protected $objectManager;
 
     /**
      * @Flow\Inject
      * @var PersistenceManagerInterface
      */
-    protected PersistenceManagerInterface $persistenceManager;
+    protected $persistenceManager;
 
     /**
      * @Flow\Inject
      * @var EventEmittingService
      */
-    protected EventEmittingService $eventEmittingService;
+    protected $eventEmittingService;
 
     /**
      * @var string
