@@ -39,7 +39,7 @@ class PartialContentImportService
      * @Flow\Inject
      * @var PackageManager
      */
-    protected PackageManager $packageManager;
+    protected $packageManager;
 
     /**
      * @Flow\Inject
