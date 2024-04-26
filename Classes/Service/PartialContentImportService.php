@@ -158,10 +158,17 @@ class PartialContentImportService
                 break;
     }
 
+    public function findNextExtensionNode( \XMLReader $xml ): bool {
+        while ($xml->read())
+            if ($xml->nodeType === \XMLReader::ELEMENT && $xml->name === 'extension')
+                return true;
+        return false;
+    }
+
     /**
      * @throws NeosException
      */
-    protected function getXMLProperty(\XMLReader $xml, string $property ): string {
+    public function getXMLProperty(\XMLReader $xml, string $property ): string {
         $value = $xml->getAttribute($property);
         if ($value === null)
             throw new NeosException(sprintf('Error: Unable to read property "%s".', $property), 1711117563);

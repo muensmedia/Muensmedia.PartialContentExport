@@ -98,6 +98,10 @@ class ContentCommandController extends CommandController
      */
     protected $nodePathNormalizer;
 
+    const Supported_Extensions = [
+        'sitegeist/taxonomy'
+    ];
+
     /**
      * @param ThrowableStorageInterface $throwableStorage
      */
@@ -143,7 +147,11 @@ class ContentCommandController extends CommandController
         $this->outputLine('--');
     }
 
-    public function importCommand(?string $packageKey = null, ?string $filename = null, ?string $targetPath = null): void
+    public function importCommand(
+        ?string $packageKey = null,
+        ?string $filename = null,
+        ?string $targetPath = null
+    ): void
     {
         if ($packageKey === null && $filename === null) {
             $this->outputLine('You have to specify either "--package-key" or "--filename"');
@@ -181,6 +189,33 @@ class ContentCommandController extends CommandController
             if (!$this->confirmPath("The new content will be inserted as follows.", $siteNodeName, $targetPath, '[NEW] -> ', "$nodeName ($nodeType)"))
                 return;
         }
+
+        while ( $this->importService->findNextExtensionNode( $xmlReader ) ) {
+            $package = $this->importService->getXMLProperty( $xmlReader, 'package' );
+            if (!in_array( $package, self::Supported_Extensions ))
+                throw new NeosException(sprintf('Error: The export contains data for package "%s" which is not supported by this importer.', $package), 1714144525);
+
+            if (empty($version = ComposerUtility::getPackageVersion( $package )))
+                throw new NeosException(sprintf('Error: Data for package "%s" is included in the export, but the package is not installed.', $package), 1714143331);
+
+            $containedVersion = $this->importService->getXMLProperty( $xmlReader, 'version' );
+            if ($version !== $containedVersion) {
+                $this->outputLine('--');
+                $this->outputLine( "<b>Warning: </b> The export contains data for <b>{$package}</b>, but the versions do not match." );
+                $this->outputLine("Locally installed: <b>{$version}</b>");
+                $this->outputLine("Exported from: <b>{$containedVersion}</b>");
+                if (!$this->output->askConfirmation('Importing data from a different package version may cause problems. Continue (y/n)?', false ))
+                    return;
+                $this->outputLine('--');
+            }
+        }
+
+        $xmlReader = new \XMLReader();
+        if ($xmlReader->open($xmlPath, null, LIBXML_PARSEHUGE) === false) {
+            throw new NeosException(sprintf('Error: XMLReader could not open "%s".', $xmlPath), 1710510972);
+        }
+
+        $this->importService->findPartialImportRoot( $xmlReader );
 
         // Since this command uses a lot of memory when large sites are imported, we warn the user to watch for
         // the confirmation of a successful import.
@@ -222,6 +257,10 @@ class ContentCommandController extends CommandController
     {
         if (!$this->confirmPath( "We're about to export the marked node and all it's sub-nodes.", $siteName, $source))
             return;
+
+        foreach ($extension as $e)
+            if (!in_array($e, self::Supported_Extensions))
+                throw new NeosException("Error: The package $e is not supported.", 1714144368);
 
         if ($detectExtensions) {
             $this->confirmExtension( $extension, 'sitegeist/taxonomy',
