@@ -3,7 +3,10 @@ namespace Muensmedia\PartialContentExport\Service;
 
 use Neos\ContentRepository\Domain\Repository\NodeDataRepository;
 use Neos\ContentRepository\Exception\NodeException;
+use Neos\Eel\FlowQuery\FlowQuery;
 use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Composer\ComposerUtility;
+use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\PackageManager;
 use Neos\Neos\Domain\Repository\SiteRepository;
 use Neos\Neos\Domain\Service\ContentContext;
@@ -13,6 +16,7 @@ use Neos\Utility\Files;
 use Neos\Neos\Domain\Exception as NeosException;
 use Neos\ContentRepository\Domain\Service\ContextFactoryInterface;
 use Neos\ContentRepository\Domain\Service\ImportExport\NodeExportService;
+use Sitegeist\Taxonomy\Service\TaxonomyService;
 use XMLWriter;
 
 /**
@@ -62,6 +66,12 @@ class PartialContentExportService
     protected $nodePathNormalizer;
 
     /**
+     * @var ObjectManagerInterface
+     * @Flow\Inject
+     */
+    protected $objectManager;
+
+    /**
      * Absolute path to exported resources, or NULL if resources should be inlined in the exported XML
      *
      * @var null|string
@@ -84,11 +94,13 @@ class PartialContentExportService
      * @param bool $tidy
      * @param string|null $nodeTypeFilter
      * @param string|null $filename
+     * @param string[] $extensions
      * @return void
      * @throws FilesException
      * @throws NeosException
+     * @throws NodeException
      */
-    public function exportToPackage(string $sourcePath, string $packageKey, bool $tidy = true, ?string $nodeTypeFilter = null, ?string $filename = null): void
+    public function exportToPackage(string $sourcePath, string $packageKey, bool $tidy = true, ?string $nodeTypeFilter = null, ?string $filename = null, array $extensions = []): void
     {
         // Check if the package is available
         if (!$this->packageManager->isPackageAvailable($packageKey))
@@ -112,7 +124,7 @@ class PartialContentExportService
         $this->xmlWriter->openUri($contentPathAndFilename);
         $this->xmlWriter->setIndent($tidy);
 
-        if ($this->export($nodeTypeFilter))
+        if ($this->export($nodeTypeFilter,$extensions))
             $this->xmlWriter->flush();
     }
 
@@ -122,11 +134,13 @@ class PartialContentExportService
      * @param string $pathAndFilename
      * @param bool $tidy
      * @param string|null $nodeTypeFilter
+     * @param string[] $extensions
      * @return void
      * @throws FilesException
      * @throws NeosException
+     * @throws NodeException
      */
-    public function exportToFile(string $source, string $pathAndFilename, bool $tidy = true, ?string $nodeTypeFilter = null): void
+    public function exportToFile(string $source, string $pathAndFilename, bool $tidy = true, ?string $nodeTypeFilter = null, array $extensions = []): void
     {
         // Normalize segment path
         $this->normalizedSegments = $this->nodePathNormalizer->normalizeSegments($source);
@@ -140,7 +154,7 @@ class PartialContentExportService
         $this->xmlWriter->openUri($pathAndFilename);
         $this->xmlWriter->setIndent($tidy);
 
-        if ($this->export($nodeTypeFilter))
+        if ($this->export($nodeTypeFilter, $extensions))
             $this->xmlWriter->flush();
     }
 
@@ -148,10 +162,12 @@ class PartialContentExportService
      * @param string $sourcePath
      * @param bool $tidy
      * @param string|null $nodeTypeFilter
+     * @param string[] $extensions
      * @return string
      * @throws NeosException
+     * @throws NodeException
      */
-    public function exportToString(string $sourcePath, bool $tidy = false, ?string $nodeTypeFilter = null): string
+    public function exportToString(string $sourcePath, bool $tidy = false, ?string $nodeTypeFilter = null, array $extensions = []): string
     {
         // Normalize segment path
         $this->normalizedSegments = $this->nodePathNormalizer->normalizeSegments($sourcePath);
@@ -161,20 +177,40 @@ class PartialContentExportService
         $this->xmlWriter->openMemory();
         $this->xmlWriter->setIndent($tidy);
 
-        return $this->export($nodeTypeFilter)
+        return $this->export($nodeTypeFilter, $extensions)
             ? $this->xmlWriter->outputMemory(true)
             : '';
     }
 
+    private function writeExtensionPackage(string $package, callable $callback) {
+        $version = ComposerUtility::getPackageVersion($package);
+        if (empty($version))
+            throw new NeosException(sprintf('Error: Package "%s" is not installed.', $package), 1714134317);
+
+        $this->xmlWriter->startElement('extension');
+        $this->xmlWriter->writeAttribute('package', $package);
+        $this->xmlWriter->writeAttribute('version', $version);
+
+        $callback();
+
+        $this->xmlWriter->endElement();
+    }
+
     /**
      * @param string|null $nodeTypeFilter
+     * @param array $extensions
      * @return bool
-     * @throws NeosException|NodeException
+     * @throws NeosException
+     * @throws NodeException
      */
-    protected function export(?string $nodeTypeFilter): bool
+    protected function export(?string $nodeTypeFilter, array $extensions = []): bool
     {
         $sites = $this->siteRepository->findByNodeName($this->normalizedSegments[0])->toArray();
         if (count($sites) !== 1) throw new NeosException(sprintf('Error: Unable to locate site "%s".', $this->normalizedSegments[0]), 1706886736);
+
+        foreach ($extensions as $package)
+            if (empty(ComposerUtility::getPackageVersion($package)))
+                throw new NeosException(sprintf('Error: Package "%s" is not installed.', $package), 1714134317);
 
         /** @var ContentContext $contentContext */
         $contentContext = $this->contextFactory->create([
@@ -202,10 +238,34 @@ class PartialContentExportService
 
         $this->xmlWriter->endElement();
 
+        foreach ($extensions as $extension) {
+            switch ($extension) {
+                case 'sitegeist/taxonomy':
+                    $fn = fn() => $this->exportPackageSitegeistTaxonomy();
+                    break;
+                default: $fn = null;
+            }
+
+            if ($fn !== null) $this->writeExtensionPackage($extension, $fn);
+        }
+
         $this->xmlWriter->endElement();
         $this->xmlWriter->endDocument();
 
         return true;
+    }
+
+    private function exportPackageSitegeistTaxonomy(): void {
+        $taxonomyService = $this->objectManager->get(TaxonomyService::class);
+        foreach ((new FlowQuery([$taxonomyService->getRoot()]))
+                ->children("[instanceof {$taxonomyService->getVocabularyNodeType()}]")
+                ->get() as $vocabulary) {
+
+            $this->xmlWriter->startElement('vocabulary');
+            $this->xmlWriter->writeAttribute('name', $vocabulary->getName());
+            $this->nodeExportService->export($vocabulary->getPath(), 'live', $this->xmlWriter,  false, false);
+            $this->xmlWriter->endElement();
+        }
     }
 
 }

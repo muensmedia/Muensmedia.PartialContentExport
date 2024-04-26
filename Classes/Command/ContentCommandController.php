@@ -6,6 +6,7 @@ use Muensmedia\PartialContentExport\Service\PartialContentExportService;
 use Muensmedia\PartialContentExport\Service\PartialContentImportService;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Cli\CommandController;
+use Neos\Flow\Composer\ComposerUtility;
 use Neos\Flow\Log\ThrowableStorageInterface;
 use Neos\Flow\Log\Utility\LogEnvironment;
 use Neos\Flow\Package\PackageManager;
@@ -131,6 +132,17 @@ class ContentCommandController extends CommandController
         return $this->output->askConfirmation('Continue (y/n)?', false );
     }
 
+    protected function confirmExtension( array &$extensions, string $extension, string $description ): void {
+        if (in_array($extension, $extensions) || empty($version = ComposerUtility::getPackageVersion($extension))) return;
+
+        $this->outputLine('--');
+        $this->outputLine( "You have <b>$extension</b> installed in version $version." );
+        $this->outputLine( $description );
+        if ($this->output->askConfirmation('Include this in the export (y/n)?', false ))
+            $extensions[] = $extension;
+        $this->outputLine('--');
+    }
+
     public function importCommand(?string $packageKey = null, ?string $filename = null, ?string $targetPath = null): void
     {
         if ($packageKey === null && $filename === null) {
@@ -197,10 +209,25 @@ class ContentCommandController extends CommandController
      * @throws FilesException
      * @throws NeosException
      */
-    public function exportCommand(string $source, string $siteName = null, bool $tidy = true, string $filename = null, string $packageKey = null, string $nodeTypeFilter = null): void
+    public function exportCommand(
+        string $source,
+        string $siteName = null,
+        bool $tidy = true,
+        string $filename = null,
+        string $packageKey = null,
+        string $nodeTypeFilter = null,
+        array $extension = [],
+        bool $detectExtensions = true
+    ): void
     {
         if (!$this->confirmPath( "We're about to export the marked node and all it's sub-nodes.", $siteName, $source))
             return;
+
+        if ($detectExtensions) {
+            $this->confirmExtension( $extension, 'sitegeist/taxonomy',
+                'You can include <b>all</b> vocabularies present in this Neos instance in this export.'
+            );
+        }
 
         $node = $this->nodePathNormalizer->getNodeFromPathOrIdentifier( $siteName, $source );
         if (!$node)
@@ -210,17 +237,17 @@ class ContentCommandController extends CommandController
         if ($packageKey !== null) {
 
             $this->outputLine('Exporting the content at "%s" to package "%s"...', [$sourcePath, $packageKey]);
-            $this->exportService->exportToPackage($sourcePath, $packageKey, $tidy, $nodeTypeFilter, $filename );
+            $this->exportService->exportToPackage($sourcePath, $packageKey, $tidy, $nodeTypeFilter, $filename, $extension );
             $this->outputLine('Partial export of "%s" to package "%s" completed.', [$sourcePath, $packageKey]);
 
         } elseif ($filename !== null) {
 
             $this->outputLine('Exporting the content at "%s" to file "%s"...', [$sourcePath, $filename]);
-            $this->exportService->exportToFile($sourcePath, $filename, $tidy, $nodeTypeFilter );
+            $this->exportService->exportToFile($sourcePath, $filename, $tidy, $nodeTypeFilter, $extension );
             $this->outputLine('Partial export of "%s" to file "%s" completed.', [$sourcePath, $filename]);
 
         } else {
-            $this->output($this->exportService->exportToString($sourcePath, $tidy, $nodeTypeFilter));
+            $this->output($this->exportService->exportToString($sourcePath, $tidy, $nodeTypeFilter, $extension));
         }
     }
 
