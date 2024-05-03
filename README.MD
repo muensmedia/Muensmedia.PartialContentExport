@@ -13,6 +13,8 @@ the entire site is not an option, than this is the package for you!
 ## Features
 - Export individual nodes and their descendants without exporting the entire site
 - Import these nodes in a different Neos instance at the same or a different path
+- *Since v1.2.0:* Include taxonomy data from the [Sitegeist.Taxonomy](https://github.com/sitegeist/Sitegeist.Taxonomy)
+package in the exported data
 
 ### Author
 
@@ -40,14 +42,16 @@ This will export the node identified by `16e80b43-393b-42c6-8e1a-2f280640fbf0` i
 `Muensmedia.Site/Resources/Private/Content` directory. Additionally, a `Resources` directory containing all resources
 used in the exported content will be created.
 
-| Option           | Example                                                                                               | Explanation                                                                                                                                                                                                                              |
-|------------------|-------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| source           | `16e80b43-393b-42c6-8e1a-2f280640fbf0`<br/>or<br/>`/sites/site/node-fwrkqocrc01hp/node-v76vwg2cymq7u` | The page or content element to export. Can be either a node identifier or a node path.                                                                                                                                                   |
-| package-key      | `Muensmedia.Site`                                                                                     | Optional. The package to write the exported content xml into. If no package key is given, `--filename` must be an absolute path.                                                                                                         |
-| filename         | `easter-campaign.xml`                                                                                 | Optional. The file name for the exported xml. Must be an absolute path if `--package-key` is not given.                                                                                                                                  |
-| site-name        | `site`                                                                                                | Optional. The site to export from. Only needed if a node identifier is given in `--source`.                                                                                                                                              |
-| tidy             | `0`                                                                                                   | Optional. Exports formatted xml (to be more easily readable). Defaults to `true`                                                                                                                                                         |
-| node-type-filter | `!Neos.Neos:Page,Neos.Neos:Text`                                                                      | Optional. Allows limiting the export to certain node types. See the documentation for the original [site:export](https://neos.readthedocs.io/en/stable/References/CommandReference.html#neos-neos-site-export) command for more details. |
+| Option            | Example                                                                                               | Explanation                                                                                                                                                                                                                              |
+|-------------------|-------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| source            | `16e80b43-393b-42c6-8e1a-2f280640fbf0`<br/>or<br/>`/sites/site/node-fwrkqocrc01hp/node-v76vwg2cymq7u` | The page or content element to export. Can be either a node identifier or a node path.                                                                                                                                                   |
+| package-key       | `Muensmedia.Site`                                                                                     | Optional. The package to write the exported content xml into. If no package key is given, `--filename` must be an absolute path.                                                                                                         |
+| filename          | `easter-campaign.xml`                                                                                 | Optional. The file name for the exported xml. Must be an absolute path if `--package-key` is not given.                                                                                                                                  |
+| site-name         | `site`                                                                                                | Optional. The site to export from. Only needed if a node identifier is given in `--source`.                                                                                                                                              |
+| tidy              | `0`                                                                                                   | Optional. Exports formatted xml (to be more easily readable). Defaults to `true`                                                                                                                                                         |
+| node-type-filter  | `!Neos.Neos:Page,Neos.Neos:Text`                                                                      | Optional. Allows limiting the export to certain node types. See the documentation for the original [site:export](https://neos.readthedocs.io/en/stable/References/CommandReference.html#neos-neos-site-export) command for more details. |
+| detect-extensions | `0`                                                                                                   | Optional. Checks installed composer packages to find compatible extension data that can be included in the export. Defaults to `true`                                                                                                    |
+| extension         | `sitegeist/taxonomy`                                                                                  | Optional. Includes data from the given extension into the export. Can be set multiple times to include data from multiple extensions.                                                                                                    |
 
 
 ### Import content
@@ -59,12 +63,30 @@ Example: Simply importing content to the same location in the content tree that 
 The original location of the exported content is stored in the xml file. If no other location is specified, the content
 will be imported at the same location. Content already existing at that location will be merged with the new one.
 
-
 | Option        | Example                                                                                               | Explanation                                                                                                                                                                                                                                           |
 |---------------|-------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | package-key   | `Muensmedia.Site`                                                                                     | Optional. The package to fetch the exported content xml from. If no package key is given, `--filename` must be an absolute path.                                                                                                                      |
 | filename      | `easter-campaign.xml`                                                                                 | Optional. The file name for the exported xml. Must be an absolute path if `--package-key` is not given.                                                                                                                                               |
 | target-path   | `16e80b43-393b-42c6-8e1a-2f280640fbf0`<br/>or<br/>`/sites/site/node-fwrkqocrc01hp/node-v76vwg2cymq7u` | Optional. The page or content item to import into (i.e. the parent node new content will be inserted into.) If the root node of the imported content already exists, it is also valid to specify its node identifier or path instead of its parent's. |
+
+### Supported extensions
+
+The Partial Content Exporter can import/export additional data from extensions that is not directly attached to the 
+content repository node tree.
+
+When exporting content, we will scan for compatible extensions and ask you if you want to include their data. You can 
+disable the automatic scan using `--detect-extensions 0`. You can also directly specify the extensions you would like to
+export using `--extension <package name>`, for example `--extension sitegeist/taxonomy`. 
+
+When importing data, all included extension data is imported as well. If the required package is not installed in the
+target Neos instance, the import will fail with an error message. If the package is installed in a different version
+(no matter if it's higher or lower), a warning will be displayed but you have the option to import the data anyway.
+
+Currently, only the package [Sitegeist.Taxonomy](https://github.com/sitegeist/Sitegeist.Taxonomy) is supported.
+
+| Extension                                                             | Name                 | Remarks                                                                                                                                                    |
+|-----------------------------------------------------------------------|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Sitegeist.Taxonomy](https://github.com/sitegeist/Sitegeist.Taxonomy) | `sitegeist/taxonomy` | Includes **all** taxonomy data of **all** sites in your Neos instance (*not just the taxonomies used in the given exported node subtree*) into the export. |
 
 ### Current limitations
 
