@@ -190,6 +190,8 @@ class ContentCommandController extends CommandController
                 return;
         }
 
+        $extensions = [];
+
         while ( $this->importService->findNextExtensionNode( $xmlReader ) ) {
             $package = $this->importService->getXMLProperty( $xmlReader, 'package' );
             if (!in_array( $package, self::Supported_Extensions ))
@@ -207,7 +209,12 @@ class ContentCommandController extends CommandController
                 if (!$this->output->askConfirmation('Importing data from a different package version may cause problems. Continue (y/n)?', false ))
                     return;
                 $this->outputLine('--');
+            } else {
+                $this->outputLine( "Found data for package <b>{$package}</b> in version <b>{$containedVersion}</b>." );
+                $extensions[] = $package;
             }
+
+
         }
 
         $xmlReader = new \XMLReader();
@@ -229,7 +236,7 @@ class ContentCommandController extends CommandController
 
         $site = null;
         try {
-            $site = $this->importService->importFromXML($xmlReader, dirname( $xmlPath ), $targetPath);
+            $site = $this->importService->importFromXML($xmlReader, dirname( $xmlPath ), $targetPath, $extensions);
         } catch (\Exception $exception) {
             $logMessage = $this->throwableStorage->logThrowable($exception);
             $this->logger->error($logMessage, LogEnvironment::fromMethodName(__METHOD__));

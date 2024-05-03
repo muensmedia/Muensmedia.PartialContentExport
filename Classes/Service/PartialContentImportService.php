@@ -6,6 +6,7 @@ use Neos\ContentRepository\Domain\Projection\Content\TraversableNodeInterface;
 use Neos\ContentRepository\Exception\ImportException;
 use Neos\ContentRepository\Exception\NodeException;
 use Neos\ContentRepository\Exception\NodeExistsException;
+use Neos\Eel\FlowQuery\FlowQuery;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\Exception\InvalidPackageStateException;
@@ -26,6 +27,7 @@ use Neos\ContentRepository\Domain\Repository\WorkspaceRepository;
 use Neos\ContentRepository\Domain\Service\ContextFactoryInterface;
 use Neos\ContentRepository\Domain\Service\ImportExport\NodeImportService;
 use Neos\ContentRepository\Domain\Utility\NodePaths;
+use Sitegeist\Taxonomy\Service\TaxonomyService;
 
 /**
  * The Site Import Service
@@ -215,7 +217,7 @@ class PartialContentImportService
      * @throws ImportException
      * @throws NeosException
      */
-    public function importFromXML(\XMLReader $xmlReader, string $directory, string $targetPath): Site
+    public function importFromXML(\XMLReader $xmlReader, string $directory, string $targetPath, array $extensions): Site
     {
         /** @var Site $importedSite */
         $site = null;
@@ -248,8 +250,35 @@ class PartialContentImportService
         if ($site === null) {
             throw new NeosException(sprintf('The XML file did not contain a valid site node.'), 1418999522);
         }
+
+        while ($this->findNextExtensionNode($xmlReader)) {
+            $extension = $this->getXMLProperty( $xmlReader, 'package' );
+            if (in_array($extension, $extensions))
+                switch ($extension) {
+                    case 'sitegeist/taxonomy':
+                        $this->importPackageSitegeistTaxonomy($xmlReader);
+                        break;
+                    default: break;
+                }
+        }
+
         $this->emitSiteImported($site);
         return $site;
+    }
+
+    private function importPackageSitegeistTaxonomy(\XMLReader $xmlReader): void {
+        $taxonomyRoot = $this->objectManager->get(TaxonomyService::class)->getRoot();
+
+        while ($xmlReader->read()) {
+            if ($xmlReader->nodeType != \XMLReader::ELEMENT ||( $xmlReader->name !== 'vocabulary' && $xmlReader->name !== 'extension')) {
+                continue;
+            }
+
+            if ($xmlReader->name === 'extension') break;
+
+            $vocabularyName = (string) $xmlReader->getAttribute('name');
+            $this->nodeImportService->import($xmlReader, $taxonomyRoot->getPath());
+        }
     }
 
     /**
