@@ -4,6 +4,7 @@ namespace Muensmedia\PartialContentExport\Command;
 use Muensmedia\PartialContentExport\Service\NodePathNormalizerService;
 use Muensmedia\PartialContentExport\Service\PartialContentExportService;
 use Muensmedia\PartialContentExport\Service\PartialContentImportService;
+use Neos\ContentRepository\Exception\NodeException;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Cli\CommandController;
 use Neos\Flow\Composer\ComposerUtility;
@@ -249,7 +250,7 @@ class ContentCommandController extends CommandController
 
     /**
      * @throws FilesException
-     * @throws NeosException
+     * @throws NeosException|NodeException
      */
     public function exportCommand(
         string $source,
@@ -259,7 +260,8 @@ class ContentCommandController extends CommandController
         string $packageKey = null,
         string $nodeTypeFilter = null,
         array $extension = [],
-        bool $detectExtensions = true
+        bool $detectExtensions = true,
+        string $errorMode = 'abort'
     ): void
     {
         if (!$this->confirmPath( "We're about to export the marked node and all it's sub-nodes.", $siteName, $source))
@@ -283,17 +285,17 @@ class ContentCommandController extends CommandController
         if ($packageKey !== null) {
 
             $this->outputLine('Exporting the content at "%s" to package "%s"...', [$sourcePath, $packageKey]);
-            $this->exportService->exportToPackage($sourcePath, $packageKey, $tidy, $nodeTypeFilter, $filename, $extension );
+            $this->exportService->exportToPackage($sourcePath, $packageKey, $tidy, $nodeTypeFilter, $filename, $extension, $errorMode );
             $this->outputLine('Partial export of "%s" to package "%s" completed.', [$sourcePath, $packageKey]);
 
         } elseif ($filename !== null) {
 
             $this->outputLine('Exporting the content at "%s" to file "%s"...', [$sourcePath, $filename]);
-            $this->exportService->exportToFile($sourcePath, $filename, $tidy, $nodeTypeFilter, $extension );
+            $this->exportService->exportToFile($sourcePath, $filename, $tidy, $nodeTypeFilter, $extension, $errorMode );
             $this->outputLine('Partial export of "%s" to file "%s" completed.', [$sourcePath, $filename]);
 
         } else {
-            $this->output($this->exportService->exportToString($sourcePath, $tidy, $nodeTypeFilter, $extension));
+            $this->output($this->exportService->exportToString($sourcePath, $tidy, $nodeTypeFilter, $extension, $errorMode ));
         }
     }
 

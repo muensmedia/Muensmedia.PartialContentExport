@@ -2,9 +2,11 @@
 namespace Muensmedia\PartialContentExport\Service;
 
 use Neos\ContentRepository\Domain\Repository\NodeDataRepository;
+use Neos\ContentRepository\Exception\ExportException;
 use Neos\ContentRepository\Exception\NodeException;
 use Neos\Eel\FlowQuery\FlowQuery;
 use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Cli\ConsoleOutput;
 use Neos\Flow\Composer\ComposerUtility;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\PackageManager;
@@ -95,12 +97,13 @@ class PartialContentExportService
      * @param string|null $nodeTypeFilter
      * @param string|null $filename
      * @param string[] $extensions
+     * @param string $errorMode
      * @return void
      * @throws FilesException
      * @throws NeosException
      * @throws NodeException
      */
-    public function exportToPackage(string $sourcePath, string $packageKey, bool $tidy = true, ?string $nodeTypeFilter = null, ?string $filename = null, array $extensions = []): void
+    public function exportToPackage(string $sourcePath, string $packageKey, bool $tidy = true, ?string $nodeTypeFilter = null, ?string $filename = null, array $extensions = [], string $errorMode = 'abort'): void
     {
         // Check if the package is available
         if (!$this->packageManager->isPackageAvailable($packageKey))
@@ -124,7 +127,11 @@ class PartialContentExportService
         $this->xmlWriter->openUri($contentPathAndFilename);
         $this->xmlWriter->setIndent($tidy);
 
-        if ($this->export($nodeTypeFilter,$extensions))
+        // Error handling setting
+        $ignoreErrors = $errorMode === 'ignore' || $errorMode === 'warn';
+        $silenceErrors = $errorMode === 'ignore';
+
+        if ($this->export($nodeTypeFilter,$extensions,$ignoreErrors,$silenceErrors))
             $this->xmlWriter->flush();
     }
 
@@ -135,12 +142,13 @@ class PartialContentExportService
      * @param bool $tidy
      * @param string|null $nodeTypeFilter
      * @param string[] $extensions
+     * @param string $errorMode
      * @return void
      * @throws FilesException
      * @throws NeosException
      * @throws NodeException
      */
-    public function exportToFile(string $source, string $pathAndFilename, bool $tidy = true, ?string $nodeTypeFilter = null, array $extensions = []): void
+    public function exportToFile(string $source, string $pathAndFilename, bool $tidy = true, ?string $nodeTypeFilter = null, array $extensions = [], string $errorMode = 'abort'): void
     {
         // Normalize segment path
         $this->normalizedSegments = $this->nodePathNormalizer->normalizeSegments($source);
@@ -154,7 +162,11 @@ class PartialContentExportService
         $this->xmlWriter->openUri($pathAndFilename);
         $this->xmlWriter->setIndent($tidy);
 
-        if ($this->export($nodeTypeFilter, $extensions))
+        // Error handling setting
+        $ignoreErrors = $errorMode === 'ignore' || $errorMode === 'warn';
+        $silenceErrors = $errorMode === 'ignore';
+
+        if ($this->export($nodeTypeFilter, $extensions, $ignoreErrors, $silenceErrors))
             $this->xmlWriter->flush();
     }
 
@@ -163,11 +175,12 @@ class PartialContentExportService
      * @param bool $tidy
      * @param string|null $nodeTypeFilter
      * @param string[] $extensions
+     * @param string $errorMode
      * @return string
      * @throws NeosException
      * @throws NodeException
      */
-    public function exportToString(string $sourcePath, bool $tidy = false, ?string $nodeTypeFilter = null, array $extensions = []): string
+    public function exportToString(string $sourcePath, bool $tidy = false, ?string $nodeTypeFilter = null, array $extensions = [], string $errorMode = 'abort'): string
     {
         // Normalize segment path
         $this->normalizedSegments = $this->nodePathNormalizer->normalizeSegments($sourcePath);
@@ -177,7 +190,11 @@ class PartialContentExportService
         $this->xmlWriter->openMemory();
         $this->xmlWriter->setIndent($tidy);
 
-        return $this->export($nodeTypeFilter, $extensions)
+        // Error handling setting
+        $ignoreErrors = $errorMode === 'ignore' || $errorMode === 'warn';
+        $silenceErrors = $errorMode === 'ignore';
+
+        return $this->export($nodeTypeFilter, $extensions, $ignoreErrors, $silenceErrors)
             ? $this->xmlWriter->outputMemory(true)
             : '';
     }
@@ -199,11 +216,13 @@ class PartialContentExportService
     /**
      * @param string|null $nodeTypeFilter
      * @param array $extensions
+     * @param bool $ignoreErrors
+     * @param bool $silenceErrors
      * @return bool
      * @throws NeosException
      * @throws NodeException
      */
-    protected function export(?string $nodeTypeFilter, array $extensions = []): bool
+    protected function export(?string $nodeTypeFilter, array $extensions = [], bool $ignoreErrors = false, bool $silenceErrors = false): bool
     {
         $sites = $this->siteRepository->findByNodeName($this->normalizedSegments[0])->toArray();
         if (count($sites) !== 1) throw new NeosException(sprintf('Error: Unable to locate site "%s".', $this->normalizedSegments[0]), 1706886736);
@@ -234,7 +253,15 @@ class PartialContentExportService
         $this->xmlWriter->writeAttribute('sourceName', $node->getProperty('title') ?? $node->getProperty('name') ?? $node->getNodeName());
         $this->xmlWriter->writeAttribute('sourceNodeType', $node->getNodeType()->getName());
 
-        $this->nodeExportService->export($fullPath, $contentContext->getWorkspaceName(), $this->xmlWriter, false, false, $this->resourcesPath, $nodeTypeFilter);
+        try {
+            $this->nodeExportService->export($fullPath, $contentContext->getWorkspaceName(), $this->xmlWriter, false, false, $this->resourcesPath, $nodeTypeFilter);
+        } catch (ExportException $e) {
+            if (!$ignoreErrors) throw $e;
+            if (!$silenceErrors) {
+                $output = new ConsoleOutput();
+                $output->output( $e->getMessage() );
+            }
+        }
 
         $this->xmlWriter->endElement();
 
@@ -258,8 +285,8 @@ class PartialContentExportService
     private function exportPackageSitegeistTaxonomy(): void {
         $taxonomyService = $this->objectManager->get(TaxonomyService::class);
         foreach ((new FlowQuery([$taxonomyService->getRoot()]))
-                ->children("[instanceof {$taxonomyService->getVocabularyNodeType()}]")
-                ->get() as $vocabulary) {
+                     ->children("[instanceof {$taxonomyService->getVocabularyNodeType()}]")
+                     ->get() as $vocabulary) {
 
             $this->xmlWriter->startElement('vocabulary');
             $this->xmlWriter->writeAttribute('name', $vocabulary->getName());
